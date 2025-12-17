@@ -1,3 +1,19 @@
+// Thêm vào đầu file server.js
+let gameHistory = []; 
+
+// Trong setInterval, tìm chỗ kết thúc phiên cược:
+if (gameState.phase === 'BET') {
+    gameState.phase = 'RESULT';
+    // ... code tính xúc xắc cũ của bạn ...
+    
+    // THÊM DÒNG NÀY: Lưu kết quả vào mảng (1 cho Tài, 0 cho Xỉu)
+    const resultBit = (gameState.result === 'TAI') ? 1 : 0;
+    gameHistory.push(resultBit);
+    if (gameHistory.length > 30) gameHistory.shift(); // Chỉ giữ 30 phiên gần nhất
+    
+    gameState.history = gameHistory; // Gắn vào gameState để gửi đi
+    io.emit('finish-bet', gameState);
+}
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -119,4 +135,5 @@ let gameHistory = []; // Lưu tối đa 20 kết quả gần nhất
 gameHistory.push(gameState.result === 'TAI' ? 1 : 0); 
 if (gameHistory.length > 20) gameHistory.shift(); // Chỉ giữ 20 phiên
 gameState.history = gameHistory; // Gửi kèm vào gameState
+
 
