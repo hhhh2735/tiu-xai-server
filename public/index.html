@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BÙI HẢI CASINO - ONLINE REALTIME</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Goldman:wght@400;700&family=Montserrat:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        /* GIỮ NGUYÊN TOÀN BỘ CSS CỦA BẠN */
+        :root { 
+            --gold: #ffd700; --gold-dark: #b8860b; --tai: #ff4d4d; --xiu: #00d2ff; --win: #2ecc71; --lose: #ff4d4d;
+            --font-main: 'Montserrat', sans-serif; --font-title: 'Goldman', cursive;
+        }
+        * { box-sizing: border-box; user-select: none; font-family: var(--font-main); -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; background: #000; height: 100dvh; width: 100vw; overflow: hidden; touch-action: none; position: fixed; }
+        #login-overlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #000 100%); z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .login-card { width: 90%; max-width: 400px; padding: 40px 25px; background: rgba(15, 23, 42, 0.9); border: 2px solid var(--gold); border-radius: 20px; box-shadow: 0 0 50px rgba(255, 215, 0, 0.2), inset 0 0 20px rgba(255, 215, 0, 0.1); text-align: center; position: relative; }
+        .login-card::before { content: "★ ★ ★ ★ ★"; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #000; padding: 0 15px; color: var(--gold); font-size: 20px; }
+        .login-box input { width: 100%; padding: 18px; border-radius: 12px; border: 1px solid var(--gold-dark); background: rgba(0,0,0,0.8); color: var(--gold); font-size: 18px; text-align: center; margin-bottom: 25px; outline: none; font-weight: bold; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5); }
+        .btn-start { width: 100%; padding: 18px; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%); color: #000; border: none; border-radius: 12px; font-weight: 900; font-size: 20px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: 0.2s; }
+        #loading-screen { position: fixed; inset: 0; background: #000; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        .logo-load { font-family: var(--font-title); font-size: 55px; background: linear-gradient(to bottom, #fff 20%, var(--gold) 50%, var(--gold-dark) 80%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.5)); }
+        .progress-w { width: 280px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,215,0,0.3); }
+        .progress-b { width: 0%; height: 100%; background: linear-gradient(90deg, var(--gold-dark), var(--gold), #fff); box-shadow: 0 0 20px var(--gold); }
+        #game-stage { position: relative; width: 100%; max-width: 950px; aspect-ratio: 16/9; background: radial-gradient(circle at center, #1e293b, #020617); border: 2px solid #334155; border-radius: 30px; overflow: hidden; display: none; box-shadow: 0 0 60px rgba(0,0,0,1); }
+        .top-hud { position: absolute; top: 0; width: 100%; height: 65px; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; z-index: 100; background: rgba(0,0,0,0.6); }
+        .balance-box { background: rgba(255,215,0,0.1); border: 2px solid var(--gold); padding: 4px 15px; border-radius: 50px; color: var(--gold); font-size: 17px; font-weight: 900; }
+        .bet-grid { position: absolute; top: 25%; width: 100%; display: flex; justify-content: space-between; padding: 0 50px; z-index: 5; }
+        .bet-box { width: 250px; height: 160px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 25px; display: flex; flex-direction: column; align-items: center; position: relative; cursor: pointer; }
+        .bet-box.locked { opacity: 0.2; filter: grayscale(1); pointer-events: none; }
+        .title { font-size: 85px; font-weight: 900; margin-top: -5px; opacity: 0.7; }
+        .plate-wrap { position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%); width: 180px; height: 180px; z-index: 10; display: flex; justify-content: center; align-items: center; }
+        .bowl { position: absolute; width: 145px; height: 145px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #f8fafc, #64748b, #0f172a); z-index: 50; display: flex; justify-content: center; align-items: center; cursor: grab; box-shadow: 0 10px 25px rgba(0,0,0,0.6); }
+        .footer { position: absolute; bottom: 0; width: 100%; height: 160px; background: #000; display: flex; flex-direction: column; align-items: center; z-index: 110; }
+        .chip-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; cursor: pointer; color: #fff; }
+        .chip-btn.active { transform: translateY(-8px); border-color: #fff; }
+        .popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 420px; background: #111; border: 1px solid #333; border-radius: 20px; padding: 20px; display: none; flex-direction: column; z-index: 1000; color: #fff; }
+        .chip-item { position: absolute; width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #fff; font-weight: 900; z-index: 11; }
+        #history-road { position: absolute; bottom: 175px; right: 20px; display: flex; gap: 5px; }
+        .road-dot { width: 26px; height: 26px; border-radius: 50%; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; color: #fff; }
+        .dot-tai { background: #ff4d4d; } .dot-xiu { background: #00d2ff; }
+    </style>
+</head>
+<body onclick="initAudio()">
+
+<div id="login-overlay">
+    <div class="login-card">
+        <div class="logo-load">BÙI HẢI</div>
+        <div class="login-box">
+            <input type="text" id="user-input-name" placeholder="NHẬP TÊN NHÂN VẬT...">
+            <button class="btn-start" onclick="startLoading()">VÀO GAME</button>
+        </div>
+    </div>
+</div>
+
+<div id="loading-screen">
+    <div class="logo-load">BÙI HẢI CASINO</div>
+    <div class="progress-w"><div class="progress-b" id="load-bar"></div></div>
+</div>
+
+<div id="container-box">
+    <div id="game-stage">
+        <div class="top-hud">
+            <div class="user-info">
+                <div id="display-user-name" style="color:#fff; font-size:11px;">PLAYER</div>
+                <div class="balance-box">TK: <span id="balance">0</span></div>
+            </div>
+            <div style="color:var(--gold);">PHIÊN: #<span id="session-id">---</span></div>
+            <div>
+                <button onclick="openNap()" style="background:var(--win); color:#fff; border:none; padding:8px; border-radius:5px;">NẠP</button>
+            </div>
+        </div>
+
+        <div class="bet-grid">
+            <div class="bet-box" id="area-XIU" onclick="handlePlaceBet('XIU', event)">
+                <div class="title" style="color:var(--xiu)">XỈU</div>
+                <div id="total-xiu-pool" style="color:#aaa; font-size:12px;">Tổng: 0</div>
+                <div class="my-val" id="my-xiu">Cược: 0</div>
+                <div class="chip-container" id="chips-XIU"></div>
+            </div>
+            <div class="bet-box" id="area-TAI" onclick="handlePlaceBet('TAI', event)">
+                <div class="title" style="color:var(--tai)">TÀI</div>
+                <div id="total-tai-pool" style="color:#aaa; font-size:12px;">Tổng: 0</div>
+                <div class="my-val" id="my-tai">Cược: 0</div>
+                <div class="chip-container" id="chips-TAI"></div>
+            </div>
+        </div>
+
+        <div class="plate-wrap">
+            <div class="bowl" id="bowl"><div id="bowl-timer" style="font-size:50px; color:#fff;">45</div></div>
+            <div id="dice-group" style="display:none; position:absolute; z-index:20;"></div>
+        </div>
+
+        <div class="footer">
+            <div class="chip-rack" style="display:flex; gap:10px; margin-top:20px;">
+                <div class="chip-btn" style="background:#e91e63" onclick="selChip(100000)">100K</div>
+                <div class="chip-btn" style="background:#ff9800" onclick="selChip(500000)">500K</div>
+                <div class="chip-btn" style="background:#f44336" onclick="selChip(1000000)">1M</div>
+            </div>
+            <div style="margin-top:20px;">
+                <button style="padding:10px 30px; background:var(--gold); border:none; border-radius:5px; font-weight:900;" onclick="confirmBet()">XÁC NHẬN</button>
+            </div>
+        </div>
+
+        <div id="history-road"></div>
+    </div>
+</div>
+
+<div id="nap-popup" class="popup">
+    <h2 style="color:var(--gold); text-align:center;">NẠP QUA ADMIN</h2>
+    <p>Vui lòng chuyển khoản đúng nội dung để được cộng tiền tự động:</p>
+    <div style="background:#222; padding:15px; border-radius:10px; line-height:2;">
+        NGÂN HÀNG: <b>MB BANK</b><br>
+        STK: <b>buihai273</b><br>
+        NỘI DUNG: <b id="nap-memo">NAP PLAYER</b>
+    </div>
+    <button onclick="closePopups()" style="margin-top:15px; padding:10px; background:#444; border:none; color:#fff; border-radius:5px;">ĐÓNG</button>
+</div>
+
+<script>
+    const socket = io(); // KẾT NỐI SERVER ONLINE
+    let balance = 0, selectedAmt = 100000, timer = 45, phase = 'BET', playerName = "";
+    let mySide = null, pendingMoney = 0, confirmedMoney = 0;
+
+    // 1. KHI VÀO GAME
+    function startLoading() {
+        const input = document.getElementById('user-input-name');
+        playerName = input.value.trim() || "PLAYER_" + Math.floor(Math.random()*999);
+        document.getElementById('display-user-name').innerText = playerName;
+        document.getElementById('nap-memo').innerText = "NAP " + playerName;
+        
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        
+        let w = 0;
+        let itv = setInterval(() => { 
+            w += 5;
+            document.getElementById('load-bar').style.width = w + '%'; 
+            if(w >= 100) { 
+                clearInterval(itv); 
+                document.getElementById('loading-screen').style.display='none'; 
+                document.getElementById('game-stage').style.display='block'; 
+                // Gửi tên lên server để lấy số dư từ Supabase
+                socket.emit('join-game', playerName);
+            } 
+        }, 50);
+    }
+
+    // 2. NHẬN DỮ LIỆU TỪ SERVER (ĐỒNG BỘ MỌI NGƯỜI CHƠI)
+    socket.on('tick', (data) => {
+        timer = data.timer;
+        phase = data.phase;
+        document.getElementById('bowl-timer').innerText = timer;
+        document.getElementById('session-id').innerText = data.session;
+        
+        if (phase === 'BET') {
+            document.getElementById('dice-group').style.display = 'none';
+            document.getElementById('bowl').style.display = 'flex';
+        }
+    });
+
+    socket.on('update-balance', (newBalance) => {
+        balance = newBalance;
+        document.getElementById('balance').innerText = balance.toLocaleString();
+    });
+
+    socket.on('update-pools', (pools) => {
+        document.getElementById('total-tai-pool').innerText = "Tổng: " + pools.tai.toLocaleString();
+        document.getElementById('total-xiu-pool').innerText = "Tổng: " + pools.xiu.toLocaleString();
+    });
+
+    socket.on('finish-bet', (data) => {
+        // Server báo kết quả
+        phase = 'RESULT';
+        document.getElementById('bowl').style.display = 'none';
+        const diceGroup = document.getElementById('dice-group');
+        diceGroup.style.display = 'block';
+        diceGroup.innerHTML = `<h1 style="color:white; font-size:40px;">${data.dice.join(' ')}</h1>`;
+        
+        // Cập nhật lịch sử (Road)
+        const road = document.getElementById('history-road');
+        const dot = document.createElement('div');
+        dot.className = `road-dot ${data.result === 'TAI' ? 'dot-tai' : 'dot-xiu'}`;
+        dot.innerText = data.dice.reduce((a,b)=>a+b);
+        road.appendChild(dot);
+        if(road.childElementCount > 10) road.removeChild(road.firstChild);
+    });
+
+    // 3. LOGIC ĐẶT CƯỢC GỬI LÊN SERVER
+    function selChip(v) { selectedAmt = v; }
+
+    function handlePlaceBet(side, e) {
+        if(phase !== 'BET' || timer <= 5) return;
+        if(mySide && mySide !== side) return;
+        if(balance < selectedAmt) return alert("Hết tiền!");
+
+        mySide = side;
+        pendingMoney += selectedAmt;
+        
+        // Hiệu ứng chip bay
+        const chip = document.createElement('div');
+        chip.className = 'chip-item';
+        chip.style.background = '#gold';
+        chip.style.left = '50%'; chip.style.top = '50%';
+        document.getElementById(`chips-${side}`).appendChild(chip);
+        
+        document.getElementById(`my-${side.toLowerCase()}`).innerText = "Cược: " + (pendingMoney + confirmedMoney).toLocaleString();
+    }
+
+    function confirmBet() {
+        if(pendingMoney <= 0) return;
+        // Gửi lệnh cược lên Server để trừ tiền trong Database
+        socket.emit('place-bet', {
+            username: playerName,
+            amount: pendingMoney,
+            side: mySide
+        });
+        confirmedMoney += pendingMoney;
+        pendingMoney = 0;
+    }
+
+    function openNap() { document.getElementById('nap-popup').style.display = 'flex'; }
+    function closePopups() { document.getElementById('nap-popup').style.display = 'none'; }
+    function initAudio() {} 
+</script>
+</body>
+</html>
