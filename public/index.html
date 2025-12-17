@@ -501,16 +501,16 @@ socket.on('init-game', (state) => {
     timer = state.timer;
     phase = state.phase;
     session = state.session;
-    
-    // Cập nhật lịch sử cầu xanh đỏ từ Server
+    document.getElementById('session-id').innerText = session;
+
     if (state.history) {
-        roadData = state.history; 
-        if (typeof drawRoad === 'function') {
-            drawRoad(); // Vẽ lại các dấu chấm trên bảng cầu
-        }
+        // Chuyển đổi dữ liệu từ 0, 1 thành Object để vẽ cầu có số điểm
+        roadData = state.history.map(item => {
+            if (typeof item === 'object') return item;
+            return { side: item === 1 ? 'TAI' : 'XIU', sum: '?' };
+        });
+        updateUI();
     }
-    
-    updateUI();
 });
 
     socket.on('tick', (data) => {
@@ -904,20 +904,15 @@ socket.on('init-game', (state) => {
     };
 
     const endDrag = () => { 
-        if(!isDrg) return; 
-        isDrg = false; 
-        // Nếu kéo bát ra xa hơn 80px thì coi như mở bát
-        if(Math.hypot(bX, bY) > 80) { 
-            bowl.style.opacity = '0'; 
+        if(dist > 60) { 
+            bowl.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+            bowl.style.opacity = '0';
+            bowl.style.transform = `translate(${bX * 2}px, ${bY * 2}px)`; // Kéo đi xa luôn
+            bowl.style.pointerEvents = 'none'; 
             setTimeout(() => { 
                 bowl.style.display = 'none'; 
                 processResult(); 
-            }, 300); 
-        } else { 
-            // Nếu kéo ít quá thì bát tự quay về vị trí cũ
-            bX = 0; bY = 0; 
-            bowl.style.transform = `translate(0, 0)`; 
-            document.getElementById('nan-text').style.display = 'block'; 
+            }, 300);
         } 
     };
 
@@ -933,7 +928,7 @@ socket.on('init-game', (state) => {
 
     function processResult() {
         if(isResultProcessed) return;
-        isResultProcessed = true; phase = 'RESULT_WAIT';
+        isResultProcessed = true; 
         const sum = resDice.reduce((a,b)=>a+b,0);
         const winSide = sum > 10 ? 'TAI' : 'XIU';
         roadData.push({ side: winSide, sum: sum, dice: [...resDice] });
