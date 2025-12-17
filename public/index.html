@@ -1529,7 +1529,7 @@ face.appendChild(dot);
 
 let bowl = document.getElementById('bowl'), isDrg = false, bX = 0, bY = 0, sX, sY;
 
-const startDrag = (e) => { if(phase !== 'NAN') return; isDrg = true; const pos = getXY(e); sX = pos.x - bX; sY = pos.y - bY; document.getElementById('nan-text').style.display = 'none'; };
+const startDrag = (e) => { if(phase !== 'RESULT') return; isDrg = true; const pos = getXY(e); sX = pos.x - bX; sY = pos.y - bY; document.getElementById('nan-text').style.display = 'none'; };
 
 const moveDrag = (e) => { if(!isDrg) return; if(e.cancelable) e.preventDefault(); const pos = getXY(e); bX = pos.x - sX; bY = pos.y - sY; bowl.style.transform = `translate(${bX}px, ${bY}px)`; };
 
