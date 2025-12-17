@@ -1,39 +1,65 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-
 const app = express();
-app.use(cors());
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const server = require('http').createServer(app);
+const io = require("socket.io")(server, {
+    cors: {
+        origin: "*", // Cho phép file index.html từ máy bạn kết nối tới
+        methods: ["GET", "POST"]
+    }
+});
 
-let timer = 45;
-let phase = 'BETTING'; 
-let sessionId = Math.floor(Math.random() * 9999);
-let lastResult = { dice: [1,1,1], sum: 3, side: 'XIU' };
+// 1. Khởi tạo trạng thái game
+let gameState = {
+    timer: 45,
+    phase: 'BET',
+    sessionId: "#" + Math.floor(Math.random() * 1000000),
+    history: []
+};
 
+// 2. Định nghĩa trang chủ (để hết lỗi Cannot GET /)
+app.get('/', (req, res) => {
+    res.send("Server Bùi Hải Casino đang chạy...");
+});
+
+// 3. Vòng lặp đếm ngược (Timer) - QUAN TRỌNG ĐỂ ĐỒNG HỒ CHẠY
 setInterval(() => {
-    timer--;
-    if (timer <= 0) {
-        if (phase === 'BETTING') {
-            phase = 'NAN'; timer = 15;
-            const d = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1];
-            const s = d[0]+d[1]+d[2];
-            lastResult = { dice: d, sum: s, side: s > 10 ? 'TAI' : 'XIU' };
-            io.emit('finish-betting', lastResult);
+    if (gameState.timer > 0) {
+        gameState.timer--;
+    } else {
+        // Hết 45 giây cược thì chuyển sang nặn/kết quả rồi reset
+        if (gameState.phase === 'BET') {
+            gameState.phase = 'RESULT';
+            gameState.timer = 15; // 15 giây chờ phiên mới
+
+            // Tạo xúc xắc ngẫu nhiên
+            const dice = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1];
+            const sum = dice.reduce((a,b) => a+b, 0);
+            const side = sum > 10 ? 'TAI' : 'XIU';
+            
+            // Gửi kết quả cho người chơi
+            io.emit('result_event', { dice, sum, side });
+            gameState.history.push({ sum, side });
         } else {
-            phase = 'BETTING'; timer = 45; sessionId++;
-            io.emit('new-session', { sessionId });
+            gameState.phase = 'BET';
+            gameState.timer = 45;
+            gameState.sessionId = "#" + Math.floor(Math.random() * 1000000);
         }
     }
-    io.emit('timer-update', { timer, phase });
+    // Gửi thời gian thực xuống client
+    io.emit('update_game', gameState);
 }, 1000);
 
 io.on('connection', (socket) => {
-    socket.emit('init-game', { timer, phase, sessionId });
-    socket.on('send-chat', (data) => io.emit('receive-chat', data));
-    socket.on('place-bet', (data) => socket.broadcast.emit('someone-bet', data));
+    console.log('Có người chơi kết nối:', socket.id);
+    socket.emit('update_game', gameState);
+
+    socket.on('place_bet', (data) => {
+        console.log(`${data.name} cược ${data.amount} vào ${data.side}`);
+    });
 });
 
-server.listen(3000, () => console.log("--- SERVER TAI XIU DANG CHAY TAI PORT 3000 ---"));
+// 4. Lắng nghe cổng của Render
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`SERVER LIVE TẠI PORT ${PORT}`);
+});
