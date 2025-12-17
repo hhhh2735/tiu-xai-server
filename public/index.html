@@ -921,20 +921,21 @@ socket.on('tick', (data) => {
 });
 let nanTimeout = null;
 socket.on('finish-bet', (data) => {
-    phase = 'RESULT'; // Đồng bộ với server
+    phase = 'RESULT'; // Đảm bảo đồng bộ phase
     resDice = data.dice; 
     
-    // Đảm bảo bát hiển thị và ở vị trí trung tâm (0,0)
+    // XÓA LỚP RUNG TẠI ĐÂY
     const bowl = document.getElementById('bowl');
+    bowl.classList.remove('rattle-urgent'); 
+    
     bowl.style.display = 'flex';
     bowl.style.opacity = '1';
     bowl.style.transform = 'translate(0px, 0px)';
-    bX = 0; bY = 0; // Reset tọa độ kéo
-
+    
     document.getElementById('bowl-timer').style.display = 'none';
     document.getElementById('nan-text').style.display = 'block';
     
-    showDiceUI(); 
+    showDiceUI();
 
     // Tự động mở bát sau 10s nếu khách lười nặn
     if(nanTimeout) clearTimeout(nanTimeout);
@@ -1562,7 +1563,15 @@ const endDrag = () => { if(!isDrg) return;
         document.getElementById('nan-text').style.display = 'block';  
     } };
 
+// Sự kiện cho điện thoại (Touch)
 bowl.addEventListener('touchstart', startDrag, {passive:false});
+window.addEventListener('touchmove', moveDrag, {passive:false});
+window.addEventListener('touchend', endDrag);
+
+// Sự kiện cho máy tính (Mouse) - Bổ sung thêm đoạn này
+bowl.addEventListener('mousedown', startDrag);
+window.addEventListener('mousemove', moveDrag);
+window.addEventListener('mouseup', endDrag);
 
 window.addEventListener('touchmove', moveDrag, {passive:false});
 
