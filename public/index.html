@@ -501,16 +501,19 @@ socket.on('init-game', (state) => {
     timer = state.timer;
     phase = state.phase;
     session = state.session;
-    document.getElementById('session-id').innerText = session;
-
+    document.getElementById('session-id').innerText = state.session;
+    
     if (state.history) {
-        // Chuyển đổi dữ liệu từ 0, 1 thành Object để vẽ cầu có số điểm
+        // Biến đổi dữ liệu từ Server (0, 1) thành Object mà updateUI hiểu được
         roadData = state.history.map(item => {
-            if (typeof item === 'object') return item;
-            return { side: item === 1 ? 'TAI' : 'XIU', sum: '?' };
+            // Nếu item là số 1 thì là TÀI, 0 là XỈU
+            return { 
+                side: item === 1 ? 'TAI' : 'XIU', 
+                sum: item === 1 ? 'T' : 'X' // Tạm thời để T/X nếu server chưa trả điểm
+            };
         });
-        updateUI();
     }
+    updateUI();
 });
 
     socket.on('tick', (data) => {
@@ -882,8 +885,6 @@ socket.on('init-game', (state) => {
         });
     }
 
-    // --- HỆ THỐNG NẶN BÁT (HỖ TRỢ CẢ CHUỘT VÀ CẢM ỨNG) ---
-    let bowl = document.getElementById('bowl'), isDrg = false, bX = 0, bY = 0, sX, sY;
 
     const startDrag = (e) => { 
         if(phase !== 'NAN') return; 
