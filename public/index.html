@@ -1032,11 +1032,46 @@ socket.on('init-game', (state) => {
         document.getElementById('bowl-timer').innerText = timer;
         document.getElementById('my-xiu').innerText = (mySide === 'XIU' ? (pendingMoney + confirmedMoney) : 0).toLocaleString();
         document.getElementById('my-tai').innerText = (mySide === 'TAI' ? (pendingMoney + confirmedMoney) : 0).toLocaleString();
+        
         const road = document.getElementById('history-road');
-        if(roadData.length > 0) { road.innerHTML = roadData.slice(-10).map(r => `<div class="road-dot ${r.side==='TAI'?'dot-tai':'dot-xiu'}">${r.sum}</div>`).join(''); }
+        // Sửa logic vẽ bảng cầu để tránh lỗi khi roadData rỗng
+        if(roadData && roadData.length > 0) { 
+            road.innerHTML = roadData.slice(-10).map(r => 
+                `<div class="road-dot ${r.side === 'TAI' ? 'dot-tai' : 'dot-xiu'}">${r.sum || '?'}</div>`
+            ).join('');
+        }
+        
         if(document.getElementById('rut-popup').style.display === 'flex') updateTurnoverUI();
     }
-</script>
 
+    // Hàm load dữ liệu từ máy người dùng
+    function loadData() {
+        const b = localStorage.getItem('buihai_balance');
+        if(b) balance = parseFloat(b);
+        const r = localStorage.getItem('buihai_road');
+        if(r) roadData = JSON.parse(r);
+        updateUI();
+    }
+
+    function saveData() {
+        localStorage.setItem('buihai_balance', balance);
+        localStorage.setItem('buihai_road', JSON.stringify(roadData));
+    }
+
+    // Khởi tạo Game khi trang web load xong
+    window.onload = () => {
+        loadData(); 
+        const savedName = localStorage.getItem('buihai_playername');
+        if(savedName) {
+            document.getElementById('user-input-name').value = savedName;
+        }
+    };
+
+    function postLoginConnect() {
+        if(playerName) {
+            socket.emit('join-game', playerName);
+        }
+    }
+</script>
 </body>
 </html>
