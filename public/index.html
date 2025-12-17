@@ -895,19 +895,24 @@ const msgBet = ["Tài đi ae ơi", "Xỉu chắc rồi", "Phiên này đẹp", "
 
 // --- ĐỒNG BỘ VỚI SERVER ---
 socket.on('tick', (data) => {
-    timer = data.timer;
+    // Cập nhật biến global
+    timer = data.timer; 
     phase = data.phase;
-    if(data.totalTai !== undefined) {
+
+    // Cập nhật giao diện đồng hồ
+    const timerEl = document.getElementById('bowl-timer');
+    if(timerEl) timerEl.innerText = timer;
+
+    // Cập nhật tổng tiền cược toàn server
+    if(document.getElementById('total-tai')) 
         document.getElementById('total-tai').innerText = data.totalTai.toLocaleString();
+    if(document.getElementById('total-xiu')) 
         document.getElementById('total-xiu').innerText = data.totalXiu.toLocaleString();
-    }
-    updateUI();
-    
+
+    // Logic rung bát khi sắp hết giờ
     if(phase === 'BET' && timer <= 5 && timer > 0) {
         document.getElementById('bowl').classList.add('rattle-urgent');
-        document.getElementById('btn-confirm').style.opacity = '0.5';
-        document.getElementById('btn-confirm').style.pointerEvents = 'none';
-        playSnd('tick'); playSnd('shake');
+        playSnd('tick');
     }
 });
 let nanTimeout = null;
