@@ -459,22 +459,15 @@
     const msgBet = ["Tài đi ae ơi", "Xỉu chắc rồi", "Phiên này đẹp", "All-in luôn!", "Theo Bùi Hải húp", "Cầu bệt rồi", "Nhẹ nhàng 500k Xỉu", "Tài mãi đỉnh", "Lại ra Xỉu à", "Đánh gì giờ ae", "Căng thế nhở", "Húp rồi", "Gỡ lại thôi", "Bắt đầu sợ rồi đấy", "Sắp giàu rồi", "Cay thế nhở", "Tiếc quá", "Sáng rực luôn","địt mẹ tài","con cụ chúng mày"];
 
     window.onload = () => {
-    loadData(); // Tải dữ liệu tiền, lịch sử từ bộ nhớ máy (nếu có)
+    // Xóa hoặc comment initSharedRoad vì ta sẽ dùng dữ liệu từ Server
+    // initSharedRoad(); 
     
-    // Tự động điền tên cũ nếu người chơi đã từng chơi
+    loadData(); // Giữ lại để load số dư local nếu cần
+    
     const savedName = localStorage.getItem('buihai_playername');
     if(savedName) {
         document.getElementById('user-input-name').value = savedName;
     }
-};
-
-// Hàm này dùng để gọi lên Server báo danh sau khi đã có tên nhân vật
-function postLoginConnect() {
-    if(playerName) {
-        console.log("Đang kết nối Server với tên:", playerName);
-        socket.emit('join-game', playerName);
-    }
-}
     
     // Yêu cầu server gửi dữ liệu khởi tạo ngay khi load xong
     if(playerName) {
@@ -501,18 +494,15 @@ socket.on('init-game', (state) => {
     timer = state.timer;
     phase = state.phase;
     session = state.session;
-    document.getElementById('session-id').innerText = state.session;
     
+    // Cập nhật lịch sử cầu xanh đỏ từ Server
     if (state.history) {
-        // Biến đổi dữ liệu từ Server (0, 1) thành Object mà updateUI hiểu được
-        roadData = state.history.map(item => {
-            // Nếu item là số 1 thì là TÀI, 0 là XỈU
-            return { 
-                side: item === 1 ? 'TAI' : 'XIU', 
-                sum: item === 1 ? 'T' : 'X' // Tạm thời để T/X nếu server chưa trả điểm
-            };
-        });
+        roadData = state.history; 
+        if (typeof drawRoad === 'function') {
+            drawRoad(); // Vẽ lại các dấu chấm trên bảng cầu
+        }
     }
+    
     updateUI();
 });
 
@@ -553,46 +543,33 @@ socket.on('init-game', (state) => {
     // --- CÁC HÀM CỦA BẠN (ĐÃ CẬP NHẬT KẾT NỐI) ---
 
     function startLoading() {
-    const input = document.getElementById('user-input-name');
-    // Lấy tên người dùng nhập hoặc tạo tên ngẫu nhiên
-    playerName = input.value.trim() || "PLAYER_" + Math.floor(Math.random() * 999);
-    localStorage.setItem('buihai_playername', playerName);
-    
-    // Gửi tên lên Server ngay khi bấm nút để lấy dữ liệu (Tiền, Lịch sử cầu)
-    if (typeof postLoginConnect === "function") {
-        postLoginConnect(); 
-    } else {
-        socket.emit('join-game', playerName);
-    }
-
-    // Hiển thị tên lên giao diện
-    document.getElementById('display-user-name').innerText = playerName;
-    
-    // Chuyển sang màn hình Loading
-    document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('loading-screen').style.display = 'flex';
-    
-    // Hiệu ứng thanh Loading chạy
-    let b = document.getElementById('load-bar'), pct = document.getElementById('load-pct'), w = 0;
-    let itv = setInterval(() => { 
-        w += Math.floor(Math.random() * 5) + 2; // Tăng tốc độ load một chút
-        if (w > 100) w = 100;
-        b.style.width = w + '%'; 
-        pct.innerText = w + '%';
+        const input = document.getElementById('user-input-name');
+        playerName = input.value.trim() || "PLAYER_" + Math.floor(Math.random()*999);
+        localStorage.setItem('buihai_playername', playerName);
         
-        if (w >= 100) { 
-            clearInterval(itv); 
-            setTimeout(() => {
-                document.getElementById('loading-screen').style.display = 'none'; 
-                document.getElementById('game-stage').style.display = 'block'; 
-                
-                // Mới: Reset lại cái bát để đảm bảo nặn được ngay phiên đầu
-                resetGame(true); 
-                startChatLoop();
-            }, 500);
-        } 
-    }, 50);
-}
+        // MỚI: Báo danh với Server
+        socket.emit('join-game', playerName);
+
+        document.getElementById('display-user-name').innerText = playerName;
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+        
+        let b = document.getElementById('load-bar'), pct = document.getElementById('load-pct'), w = 0;
+        let itv = setInterval(() => { 
+            w += Math.floor(Math.random()*3) + 1;
+            if(w > 100) w = 100;
+            b.style.width = w + '%'; 
+            pct.innerText = w + '%';
+            if(w >= 100) { 
+                clearInterval(itv); 
+                setTimeout(() => {
+                    document.getElementById('loading-screen').style.display='none'; 
+                    document.getElementById('game-stage').style.display='block'; 
+                    startChatLoop();
+                }, 500);
+            } 
+        }, 50);
+    }
 
     function confirmBet() {
         if(pendingMoney <= 0 || timer <= 5 || phase !== 'BET') return;
@@ -885,6 +862,8 @@ socket.on('init-game', (state) => {
         });
     }
 
+    // --- HỆ THỐNG NẶN BÁT (HỖ TRỢ CẢ CHUỘT VÀ CẢM ỨNG) ---
+    let bowl = document.getElementById('bowl'), isDrg = false, bX = 0, bY = 0, sX, sY;
 
     const startDrag = (e) => { 
         if(phase !== 'NAN') return; 
@@ -907,25 +886,16 @@ socket.on('init-game', (state) => {
     const endDrag = () => { 
         if(!isDrg) return; 
         isDrg = false; 
-        bowl.style.cursor = 'grab';
-        
-        const dist = Math.hypot(bX, bY);
-        
-        if(dist > 60) { // Nếu kéo đủ xa
-            bowl.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
-            bowl.style.opacity = '0';
-            bowl.style.pointerEvents = 'none'; 
-            // Đẩy bát đi xa thêm một chút theo hướng đang kéo
-            bowl.style.transform = `translate(${bX * 1.5}px, ${bY * 1.5}px)`; 
-            
+        // Nếu kéo bát ra xa hơn 80px thì coi như mở bát
+        if(Math.hypot(bX, bY) > 80) { 
+            bowl.style.opacity = '0'; 
             setTimeout(() => { 
                 bowl.style.display = 'none'; 
                 processResult(); 
             }, 300); 
         } else { 
-            // Nếu kéo chưa đủ xa, bát tự hít về vị trí cũ
+            // Nếu kéo ít quá thì bát tự quay về vị trí cũ
             bX = 0; bY = 0; 
-            bowl.style.transition = 'transform 0.2s ease-out';
             bowl.style.transform = `translate(0, 0)`; 
             document.getElementById('nan-text').style.display = 'block'; 
         } 
@@ -943,7 +913,7 @@ socket.on('init-game', (state) => {
 
     function processResult() {
         if(isResultProcessed) return;
-        isResultProcessed = true; 
+        isResultProcessed = true; phase = 'RESULT_WAIT';
         const sum = resDice.reduce((a,b)=>a+b,0);
         const winSide = sum > 10 ? 'TAI' : 'XIU';
         roadData.push({ side: winSide, sum: sum, dice: [...resDice] });
@@ -981,97 +951,24 @@ socket.on('init-game', (state) => {
     }
 
     function resetGame(firstLoad = false) {
-    // 1. Xóa bộ đếm ngược phiên cũ
-    if(nextTimerInterval) clearInterval(nextTimerInterval);
-    
-    // 2. Reset các thông số logic
-    phase = 'BET'; 
-    mySide = null; 
-    pendingMoney = 0; 
-    confirmedMoney = 0; 
-    isResultProcessed = false;
-
-    // 3. Reset cái bát (Bát phải hiện lên và cho phép chạm vào)
-    bowl.style.display = 'flex'; 
-    bowl.style.opacity = '1'; 
-    bowl.style.transform = 'translate(0,0)'; 
-    bowl.style.pointerEvents = 'auto'; // QUAN TRỌNG: Cho phép nặn
-    bowl.style.cursor = 'grab';
-    bX = 0; 
-    bY = 0;
-
-    // 4. Reset giao diện các phần tử phụ
-    document.getElementById('bowl-timer').style.display = 'block'; 
-    document.getElementById('nan-text').style.display = 'none';
-    document.getElementById('dice-group').style.display = 'none'; 
-    document.getElementById('next-session-timer').style.display = 'none';
-    
-    // 5. Reset thông báo kết quả (Tài/Xỉu to giữa màn hình)
-    const spl = document.getElementById('res-splash');
-    spl.style.transform = 'translate(-50%,-50%) scale(0)';
-    spl.style.opacity = '0';
-
-    // 6. Reset nút xác nhận cược
-    const btnConfirm = document.getElementById('btn-confirm');
-    btnConfirm.style.opacity = '1'; 
-    btnConfirm.style.pointerEvents = 'auto';
-
-    // 7. Dọn dẹp chip và mở khóa các ô cược
-    document.querySelectorAll('.chip-container').forEach(c => c.innerHTML = ''); 
-    document.querySelectorAll('.bet-box').forEach(b => { 
-        b.classList.remove('locked'); 
-        b.style.boxShadow = 'none'; 
-    });
-
-    // 8. Cập nhật lại màn hình
-    updateUI();
-}
+        if(nextTimerInterval) clearInterval(nextTimerInterval);
+        phase = 'BET'; mySide = null; pendingMoney = 0; confirmedMoney = 0; isResultProcessed = false;
+        bowl.style.display = 'flex'; bowl.style.opacity = '1'; bowl.style.transform = 'translate(0,0)'; bX = 0; bY = 0;
+        document.getElementById('bowl-timer').style.display = 'block'; document.getElementById('btn-confirm').style.opacity = '1'; document.getElementById('btn-confirm').style.pointerEvents = 'auto'; document.getElementById('dice-group').style.display = 'none'; document.getElementById('res-splash').style.transform = 'translate(-50%,-50%) scale(0)'; document.getElementById('next-session-timer').style.display = 'none'; document.getElementById('nan-text').style.display = 'none'; document.querySelectorAll('.chip-container').forEach(c => c.innerHTML = ''); document.querySelectorAll('.bet-box').forEach(b => { b.classList.remove('locked'); b.style.boxShadow = 'none'; });
+        updateUI();
+    }
 
     function updateUI() {
         document.getElementById('balance').innerText = Math.floor(balance).toLocaleString();
         document.getElementById('bowl-timer').innerText = timer;
         document.getElementById('my-xiu').innerText = (mySide === 'XIU' ? (pendingMoney + confirmedMoney) : 0).toLocaleString();
         document.getElementById('my-tai').innerText = (mySide === 'TAI' ? (pendingMoney + confirmedMoney) : 0).toLocaleString();
-        
         const road = document.getElementById('history-road');
-        // Sửa logic vẽ bảng cầu để tránh lỗi khi roadData rỗng
-        if(roadData && roadData.length > 0) { 
-            road.innerHTML = roadData.slice(-10).map(r => 
-                `<div class="road-dot ${r.side === 'TAI' ? 'dot-tai' : 'dot-xiu'}">${r.sum || '?'}</div>`
-            ).join('');
-        }
-        
+        if(roadData.length > 0) { road.innerHTML = roadData.slice(-10).map(r => `<div class="road-dot ${r.side==='TAI'?'dot-tai':'dot-xiu'}">${r.sum}</div>`).join(''); }
         if(document.getElementById('rut-popup').style.display === 'flex') updateTurnoverUI();
     }
-
-    // Hàm load dữ liệu từ máy người dùng
-    function loadData() {
-        const b = localStorage.getItem('buihai_balance');
-        if(b) balance = parseFloat(b);
-        const r = localStorage.getItem('buihai_road');
-        if(r) roadData = JSON.parse(r);
-        updateUI();
-    }
-
-    function saveData() {
-        localStorage.setItem('buihai_balance', balance);
-        localStorage.setItem('buihai_road', JSON.stringify(roadData));
-    }
-
-    // Khởi tạo Game khi trang web load xong
-    window.onload = () => {
-        loadData(); 
-        const savedName = localStorage.getItem('buihai_playername');
-        if(savedName) {
-            document.getElementById('user-input-name').value = savedName;
-        }
-    };
-
-    function postLoginConnect() {
-        if(playerName) {
-            socket.emit('join-game', playerName);
-        }
-    }
 </script>
+
 </body>
 </html>
+
