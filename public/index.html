@@ -472,6 +472,13 @@
         saveData();
     });
 
+    socket.on('update-balance-win', (data) => {
+    if (data.username === playerName) {
+        balance = data.newBalance; // Cập nhật tiền thật từ Server trả thưởng
+        updateUI();
+    }
+});
+
     socket.on('tick', (data) => {
         timer = data.timer;
         phase = data.phase;
