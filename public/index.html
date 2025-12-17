@@ -904,15 +904,29 @@ socket.on('init-game', (state) => {
     };
 
     const endDrag = () => { 
-        if(dist > 60) { 
+        if(!isDrg) return; 
+        isDrg = false; 
+        bowl.style.cursor = 'grab';
+        
+        const dist = Math.hypot(bX, bY);
+        
+        if(dist > 60) { // Nếu kéo đủ xa
             bowl.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
             bowl.style.opacity = '0';
-            bowl.style.transform = `translate(${bX * 2}px, ${bY * 2}px)`; // Kéo đi xa luôn
             bowl.style.pointerEvents = 'none'; 
+            // Đẩy bát đi xa thêm một chút theo hướng đang kéo
+            bowl.style.transform = `translate(${bX * 1.5}px, ${bY * 1.5}px)`; 
+            
             setTimeout(() => { 
                 bowl.style.display = 'none'; 
                 processResult(); 
-            }, 300);
+            }, 300); 
+        } else { 
+            // Nếu kéo chưa đủ xa, bát tự hít về vị trí cũ
+            bX = 0; bY = 0; 
+            bowl.style.transition = 'transform 0.2s ease-out';
+            bowl.style.transform = `translate(0, 0)`; 
+            document.getElementById('nan-text').style.display = 'block'; 
         } 
     };
 
