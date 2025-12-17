@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // --- KẾT NỐI SUPABASE (Lấy ở phần Project Settings -> API) ---
-const supabase = createClient('URL_SUPABASE_CUA_BAN', 'KEY_ANON_CUA_BAN');
+const supabase = createClient('https://qimyjctcipdgkfhudunv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpbXlqY3RjaXBkZ2tmaHVkdW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5OTk4NzIsImV4cCI6MjA4MTU3NTg3Mn0.Y_1Wr3DT11KDk_PmPoOoNETB-nBvYM79wrc7KyIN4vE');
 
 app.use(express.static('public'));
 
@@ -74,3 +74,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Server is running...'));
+
