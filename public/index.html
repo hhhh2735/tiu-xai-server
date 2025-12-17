@@ -28,7 +28,11 @@
 html, body { margin: 0; background: #000; height: 100dvh; width: 100vw; overflow: hidden; touch-action: none; position: fixed; }
 
 
-
+#bowl {
+    touch-action: none; /* Ngăn trình duyệt cuộn trang khi đang chạm vào bát */
+    user-select: none;
+    -webkit-user-drag: none;
+}
 /* --- GIAO DIỆN NHẬP TÊN (LOGIN) --- */
 
 #login-overlay {
@@ -917,26 +921,32 @@ socket.on('tick', (data) => {
 });
 let nanTimeout = null;
 socket.on('finish-bet', (data) => {
-    phase = 'NAN';
+    phase = 'RESULT'; // Đồng bộ với server
     resDice = data.dice; 
-    document.getElementById('bowl').classList.remove('rattle-urgent');
+    
+    // Đảm bảo bát hiển thị và ở vị trí trung tâm (0,0)
+    const bowl = document.getElementById('bowl');
+    bowl.style.display = 'flex';
+    bowl.style.opacity = '1';
+    bowl.style.transform = 'translate(0px, 0px)';
+    bX = 0; bY = 0; // Reset tọa độ kéo
+
     document.getElementById('bowl-timer').style.display = 'none';
     document.getElementById('nan-text').style.display = 'block';
     
     showDiceUI(); 
 
-    // TỰ ĐỘNG MỞ BÁT SAU 10 GIÂY NẾU KHÔNG NẶN
-    if(nanTimeout) clearTimeout(nanTimeout); // Xóa bộ đếm cũ nếu có
+    // Tự động mở bát sau 10s nếu khách lười nặn
+    if(nanTimeout) clearTimeout(nanTimeout);
     nanTimeout = setTimeout(() => {
-        if(phase === 'NAN') { 
-            // Nếu vẫn đang trong pha nặn thì tự động kích hoạt mở bát
+        if(phase === 'RESULT') { 
             bowl.style.opacity = '0'; 
             setTimeout(() => { 
                 bowl.style.display = 'none'; 
                 processResult(); 
             }, 300);
         }
-    }, 10000); 
+    }, 10000);
 });
 
 socket.on('new-session', (data) => {
@@ -1093,7 +1103,12 @@ updateUI();
 
 
 
-function getXY(e){ if(e && e.touches && e.touches[0]){ return { x:e.touches[0].clientX, y:e.touches[0].clientY }; } return e ? { x:e.clientX, y:e.clientY } : { x:null, y:null }; }
+function getXY(e) {
+    if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+}
 
 
 
