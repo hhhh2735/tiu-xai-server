@@ -899,25 +899,16 @@ const msgBet = ["Tài đi ae ơi", "Xỉu chắc rồi", "Phiên này đẹp", "
 
 // --- ĐỒNG BỘ VỚI SERVER ---
 socket.on('tick', (data) => {
-    // Cập nhật biến global
-    timer = data.timer; 
-    phase = data.phase;
-
-    // Cập nhật giao diện đồng hồ
+    timer = data.timer;
+    phase = data.phase; // Nhận phase từ server (RESULT hoặc BET)
+    
+    // Cập nhật số giây lên màn hình
     const timerEl = document.getElementById('bowl-timer');
     if(timerEl) timerEl.innerText = timer;
-
-    // Cập nhật tổng tiền cược toàn server
-    if(document.getElementById('total-tai')) 
-        document.getElementById('total-tai').innerText = data.totalTai.toLocaleString();
-    if(document.getElementById('total-xiu')) 
-        document.getElementById('total-xiu').innerText = data.totalXiu.toLocaleString();
-
-    // Logic rung bát khi sắp hết giờ
-    if(phase === 'BET' && timer <= 5 && timer > 0) {
-        document.getElementById('bowl').classList.add('rattle-urgent');
-        playSnd('tick');
-    }
+    
+    // Cập nhật tổng tiền
+    document.getElementById('total-tai').innerText = data.totalTai.toLocaleString();
+    document.getElementById('total-xiu').innerText = data.totalXiu.toLocaleString();
 });
 let nanTimeout = null;
 socket.on('finish-bet', (data) => {
@@ -1545,7 +1536,8 @@ face.appendChild(dot);
 
 let bowl = document.getElementById('bowl'), isDrg = false, bX = 0, bY = 0, sX, sY;
 
-const startDrag = (e) => { if(phase !== 'RESULT') return; isDrg = true; const pos = getXY(e); sX = pos.x - bX; sY = pos.y - bY; document.getElementById('nan-text').style.display = 'none'; };
+const startDrag = (e) => { if(phase !== 'RESULT' && phase !== 'NAN') return; 
+    isDrg = true; const pos = getXY(e); sX = pos.x - bX; sY = pos.y - bY; document.getElementById('nan-text').style.display = 'none'; };
 
 const moveDrag = (e) => { if(!isDrg) return; if(e.cancelable) e.preventDefault(); const pos = getXY(e); bX = pos.x - sX; bY = pos.y - sY; bowl.style.transform = `translate(${bX}px, ${bY}px)`; };
 
