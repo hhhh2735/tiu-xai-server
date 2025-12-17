@@ -112,3 +112,11 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Server is running on port ' + PORT));
+let gameHistory = []; // Lưu tối đa 20 kết quả gần nhất
+
+// Trong setInterval, chỗ đoạn gameState.phase === 'RESULT'
+// Sau khi tính xong kết quả (TAI/XIU), hãy thêm dòng này:
+gameHistory.push(gameState.result === 'TAI' ? 1 : 0); 
+if (gameHistory.length > 20) gameHistory.shift(); // Chỉ giữ 20 phiên
+gameState.history = gameHistory; // Gửi kèm vào gameState
+
