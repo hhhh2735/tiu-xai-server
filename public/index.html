@@ -459,11 +459,21 @@
     const msgBet = ["Tài đi ae ơi", "Xỉu chắc rồi", "Phiên này đẹp", "All-in luôn!", "Theo Bùi Hải húp", "Cầu bệt rồi", "Nhẹ nhàng 500k Xỉu", "Tài mãi đỉnh", "Lại ra Xỉu à", "Đánh gì giờ ae", "Căng thế nhở", "Húp rồi", "Gỡ lại thôi", "Bắt đầu sợ rồi đấy", "Sắp giàu rồi", "Cay thế nhở", "Tiếc quá", "Sáng rực luôn","địt mẹ tài","con cụ chúng mày"];
 
     window.onload = () => {
-        initSharedRoad();
-        loadData();
-        const savedName = localStorage.getItem('buihai_playername');
-        if(savedName) document.getElementById('user-input-name').value = savedName;
-    };
+    // Xóa hoặc comment initSharedRoad vì ta sẽ dùng dữ liệu từ Server
+    // initSharedRoad(); 
+    
+    loadData(); // Giữ lại để load số dư local nếu cần
+    
+    const savedName = localStorage.getItem('buihai_playername');
+    if(savedName) {
+        document.getElementById('user-input-name').value = savedName;
+    }
+    
+    // Yêu cầu server gửi dữ liệu khởi tạo ngay khi load xong
+    if(playerName) {
+        socket.emit('join-game', playerName);
+    }
+};
 
     // --- LOGIC SOCKET NHẬN TỪ SERVER (MỚI) ---
     socket.on('update-balance', (newBalance) => {
@@ -477,6 +487,23 @@
         balance = data.newBalance; // Cập nhật tiền thật từ Server trả thưởng
         updateUI();
     }
+});
+
+// --- NHẬN DỮ LIỆU KHỞI TẠO TỪ SERVER ---
+socket.on('init-game', (state) => {
+    timer = state.timer;
+    phase = state.phase;
+    session = state.session;
+    
+    // Cập nhật lịch sử cầu xanh đỏ từ Server
+    if (state.history) {
+        roadData = state.history; 
+        if (typeof drawRoad === 'function') {
+            drawRoad(); // Vẽ lại các dấu chấm trên bảng cầu
+        }
+    }
+    
+    updateUI();
 });
 
     socket.on('tick', (data) => {
@@ -619,7 +646,14 @@
         initAudio(); 
     }
 
-    function getXY(e){ if(e && e.touches && e.touches[0]){ return { x:e.touches[0].clientX, y:e.touches[0].clientY }; } return e ? { x:e.clientX, y:e.clientY } : { x:null, y:null }; }
+   function getXY(e) {
+    // Ưu tiên sự kiện chạm (điện thoại)
+    if (e.touches && e.touches[0]) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    // Nếu không có touch thì dùng tọa độ chuột (máy tính)
+    return { x: e.clientX, y: e.clientY };
+}
 
     function addChat(name, text) { 
         const content = document.getElementById('chat-content'); 
@@ -828,13 +862,54 @@
         });
     }
 
+    // --- HỆ THỐNG NẶN BÁT (HỖ TRỢ CẢ CHUỘT VÀ CẢM ỨNG) ---
     let bowl = document.getElementById('bowl'), isDrg = false, bX = 0, bY = 0, sX, sY;
-    const startDrag = (e) => { if(phase !== 'NAN') return; isDrg = true; const pos = getXY(e); sX = pos.x - bX; sY = pos.y - bY; document.getElementById('nan-text').style.display = 'none'; };
-    const moveDrag = (e) => { if(!isDrg) return; if(e.cancelable) e.preventDefault(); const pos = getXY(e); bX = pos.x - sX; bY = pos.y - sY; bowl.style.transform = `translate(${bX}px, ${bY}px)`; };
-    const endDrag = () => { if(!isDrg) return; isDrg = false; if(Math.hypot(bX, bY) > 80) { bowl.style.opacity = '0'; setTimeout(() => { bowl.style.display = 'none'; processResult(); }, 300); } else { bX = 0; bY = 0; bowl.style.transform = `translate(0, 0)`; document.getElementById('nan-text').style.display = 'block'; } };
+
+    const startDrag = (e) => { 
+        if(phase !== 'NAN') return; 
+        isDrg = true; 
+        const pos = getXY(e); 
+        sX = pos.x - bX; 
+        sY = pos.y - bY; 
+        document.getElementById('nan-text').style.display = 'none'; 
+    };
+
+    const moveDrag = (e) => { 
+        if(!isDrg) return; 
+        if(e.cancelable) e.preventDefault(); 
+        const pos = getXY(e); 
+        bX = pos.x - sX; 
+        bY = pos.y - sY; 
+        bowl.style.transform = `translate(${bX}px, ${bY}px)`; 
+    };
+
+    const endDrag = () => { 
+        if(!isDrg) return; 
+        isDrg = false; 
+        // Nếu kéo bát ra xa hơn 80px thì coi như mở bát
+        if(Math.hypot(bX, bY) > 80) { 
+            bowl.style.opacity = '0'; 
+            setTimeout(() => { 
+                bowl.style.display = 'none'; 
+                processResult(); 
+            }, 300); 
+        } else { 
+            // Nếu kéo ít quá thì bát tự quay về vị trí cũ
+            bX = 0; bY = 0; 
+            bowl.style.transform = `translate(0, 0)`; 
+            document.getElementById('nan-text').style.display = 'block'; 
+        } 
+    };
+
+    // Sự kiện cho điện thoại (Touch)
     bowl.addEventListener('touchstart', startDrag, {passive:false});
     window.addEventListener('touchmove', moveDrag, {passive:false});
     window.addEventListener('touchend', endDrag);
+
+    // Sự kiện cho máy tính (Mouse) - PHẦN THIẾU CỦA BẠN
+    bowl.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
 
     function processResult() {
         if(isResultProcessed) return;
