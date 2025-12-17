@@ -1,65 +1,76 @@
 const express = require('express');
-const app = express();
-const server = require('http').createServer(app);
-const io = require("socket.io")(server, {
-    cors: {
-        origin: "*", // Cho phép file index.html từ máy bạn kết nối tới
-        methods: ["GET", "POST"]
-    }
-});
+const http = require('http');
+const { Server } = require('socket.io');
+const { createClient } = require('@supabase/supabase-js');
 
-// 1. Khởi tạo trạng thái game
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+// --- KẾT NỐI SUPABASE (Lấy ở phần Project Settings -> API) ---
+const supabase = createClient('URL_SUPABASE_CUA_BAN', 'KEY_ANON_CUA_BAN');
+
+app.use(express.static('public'));
+
 let gameState = {
     timer: 45,
-    phase: 'BET',
-    sessionId: "#" + Math.floor(Math.random() * 1000000),
-    history: []
+    phase: 'BET', 
+    totalTai: 0,
+    totalXiu: 0,
+    session: 1001
 };
 
-// 2. Định nghĩa trang chủ (để hết lỗi Cannot GET /)
-app.get('/', (req, res) => {
-    res.send("Server Bùi Hải Casino đang chạy...");
-});
-
-// 3. Vòng lặp đếm ngược (Timer) - QUAN TRỌNG ĐỂ ĐỒNG HỒ CHẠY
-setInterval(() => {
-    if (gameState.timer > 0) {
-        gameState.timer--;
-    } else {
-        // Hết 45 giây cược thì chuyển sang nặn/kết quả rồi reset
+// Vòng lặp game
+setInterval(async () => {
+    gameState.timer--;
+    if (gameState.timer <= 0) {
         if (gameState.phase === 'BET') {
             gameState.phase = 'RESULT';
-            gameState.timer = 15; // 15 giây chờ phiên mới
-
-            // Tạo xúc xắc ngẫu nhiên
-            const dice = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1];
-            const sum = dice.reduce((a,b) => a+b, 0);
-            const side = sum > 10 ? 'TAI' : 'XIU';
-            
-            // Gửi kết quả cho người chơi
-            io.emit('result_event', { dice, sum, side });
-            gameState.history.push({ sum, side });
+            gameState.timer = 15;
+            const dice = [1,2,3].map(() => Math.floor(Math.random() * 6) + 1);
+            gameState.dice = dice;
+            gameState.result = (dice.reduce((a,b) => a+b) > 10) ? 'TAI' : 'XIU';
+            io.emit('finish-bet', gameState);
         } else {
             gameState.phase = 'BET';
             gameState.timer = 45;
-            gameState.sessionId = "#" + Math.floor(Math.random() * 1000000);
+            gameState.totalTai = 0;
+            gameState.totalXiu = 0;
+            gameState.session++;
+            io.emit('new-session', gameState);
         }
     }
-    // Gửi thời gian thực xuống client
-    io.emit('update_game', gameState);
+    io.emit('tick', { timer: gameState.timer, phase: gameState.phase });
 }, 1000);
 
 io.on('connection', (socket) => {
-    console.log('Có người chơi kết nối:', socket.id);
-    socket.emit('update_game', gameState);
+    // Khi người chơi đăng nhập/vào game
+    socket.on('join-game', async (username) => {
+        let { data: player } = await supabase.from('players').select('*').eq('username', username).single();
+        if (!player) {
+            const { data } = await supabase.from('players').insert([{ username: username, balance: 100000 }]).select().single();
+            player = data;
+        }
+        socket.emit('update-balance', player.balance);
+    });
 
-    socket.on('place_bet', (data) => {
-        console.log(`${data.name} cược ${data.amount} vào ${data.side}`);
+    // Xử lý đặt cược và trừ tiền trong DB
+    socket.on('place-bet', async (data) => {
+        const { username, amount, side } = data;
+        let { data: player } = await supabase.from('players').select('balance').eq(username, username).single();
+        
+        if (player && player.balance >= amount) {
+            const newBalance = player.balance - amount;
+            await supabase.from('players').update({ balance: newBalance }).eq('username', username);
+            
+            if (side === 'TAI') gameState.totalTai += amount;
+            else gameState.totalXiu += amount;
+            
+            io.emit('update-pools', { tai: gameState.totalTai, xiu: gameState.totalXiu });
+            socket.emit('update-balance', newBalance);
+        }
     });
 });
 
-// 4. Lắng nghe cổng của Render
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`SERVER LIVE TẠI PORT ${PORT}`);
-});
+server.listen(PORT, () => console.log('Server is running...'));
