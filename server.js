@@ -26,45 +26,39 @@ let gameState = {
     history: [] // Gửi kèm lịch sử về cho client
 };
 
-// --- VÒNG LẶP GAME 24/24 (BẢN TỐI ƯU) ---
+// --- VÒNG LẶP GAME 24/24 ---
 setInterval(async () => {
     gameState.timer--;
     
     if (gameState.timer <= 0) {
         if (gameState.phase === 'BET') {
-            // --- KẾT THÚC PHIÊN CƯỢC -> RA KẾT QUẢ ---
             gameState.phase = 'RESULT';
-            gameState.timer = 15; // Thời gian chờ nặn và hiển thị kết quả
+            gameState.timer = 15; 
             
-            // Random xúc xắc
             const dice = [1, 2, 3].map(() => Math.floor(Math.random() * 6) + 1);
             gameState.dice = dice;
             const sum = dice.reduce((a, b) => a + b);
             gameState.result = (sum > 10) ? 'TAI' : 'XIU';
             
-            // Cập nhật lịch sử cầu chi tiết (Dùng để vẽ bảng soi cầu)
-            gameHistory.push({ 
-                side: gameState.result, 
-                sum: sum, 
-                dice: [...dice] 
-            });
+            // Lưu lịch sử dạng Object để Client dễ vẽ cầu
+            const historyItem = { side: gameState.result, sum: sum, dice: [...dice] };
+            gameHistory.push(historyItem);
             if (gameHistory.length > 30) gameHistory.shift(); 
             gameState.history = gameHistory;
 
-            // Báo cho Client dừng cược và bắt đầu nặn
+            // PHẢI GỬI DỮ LIỆU NÀY
             io.emit('finish-bet', { 
                 dice: gameState.dice, 
-                result: gameState.result,
-                session: gameState.session 
+                result: gameState.result, 
+                session: gameState.session,
+                history: gameState.history 
             });
 
-            // Tự động trả thưởng trên Database sau 10 giây
             setTimeout(() => {
                 handlePayout(gameState.result);
             }, 10000);
 
         } else {
-            // --- BẮT ĐẦU PHIÊN MỚI ---
             gameState.phase = 'BET';
             gameState.timer = 45;
             gameState.totalTai = 0;
@@ -73,12 +67,12 @@ setInterval(async () => {
             currentBets = []; 
             io.emit('new-session', { 
                 session: gameState.session,
-                history: gameState.history // Gửi cầu mới nhất cho người mới vào
+                history: gameState.history
             });
         }
     }
 
-    // Gửi tick kèm TỔNG TIỀN để Client nhảy số Real-time
+    // QUAN TRỌNG: Client của bạn đang đợi biến 'timer' từ sự kiện 'tick'
     io.emit('tick', { 
         timer: gameState.timer, 
         phase: gameState.phase,
@@ -140,4 +134,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Server is running on port ' + PORT));
+
 
