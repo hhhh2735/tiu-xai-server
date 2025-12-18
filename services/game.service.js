@@ -12,7 +12,7 @@ function calcResult(dices) {
   const isTriple = dices[0] === dices[1] && dices[1] === dices[2];
 
   if (isTriple) {
-    return { type: "triple", sum };
+    return { type: "TRIPLE", sum };
   }
 
   if (sum >= 11) return { type: "TAI", sum };
