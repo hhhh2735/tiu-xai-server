@@ -1,14 +1,19 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// --- KẾT NỐI SUPABASE ---
-const supabase = createClient('https://qimyjctcipdgkfhudunv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpbXlqY3RjaXBkZ2tmaHVkdW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5OTk4NzIsImV4cCI6MjA4MTU3NTg3Mn0.Y_1Wr3DT11KDk_PmPoOoNETB-nBvYM79wrc7KyIN4vE');
+require('dotenv').config();
+
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 app.use(express.static('public'));
 
@@ -134,5 +139,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log('Server is running on port ' + PORT));
+
 
 
