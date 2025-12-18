@@ -1,156 +1,83 @@
-<body onclick="initAudio()">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
-    <script>
-// --- 1. CẤU HÌNH & BIẾN TOÀN CỤC ---
-const SERVER_URL = "https://tiu-xai-server.onrender.com"; 
+<script>
+const SERVER_URL = "https://tiu-xai-server.onrender.com";
 const SUPABASE_URL = "https://qimyjctcipdgkfhudunv.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; 
+const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let socket;
-let balance = 0, timer = 30, phase = 'BET';
-let mySide = null, pendingMoney = 0;
+let socket, balance = 0, timer = 30, phase = 'BET', mySide = null, pendingMoney = 0;
 
-// --- 2. KHỞI CHẠY GAME ---
 async function startLoading() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return alert("Vui lòng đăng nhập!");
 
     await fetchUserBalance(session.user.id);
-
-    socket = io(SERVER_URL, {
-        auth: { token: session.access_token },
-        transports: ["websocket"]
-    });
+    socket = io(SERVER_URL, { auth: { token: session.access_token }, transports: ["websocket"] });
 
     document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('loading-screen').style.display = 'flex';
-    
     setupSocketListeners();
-    setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 1500);
 }
 
-// --- 3. LOGIC XỬ LÝ UI & HIỆU ỨNG (FULL OPTION) ---
-
-// A. Hàm hiển thị xúc xắc
-function showDiceUI(dices) {
-    const diceContainer = document.getElementById('dice-result-container');
-    if (!diceContainer) return;
-
-    diceContainer.innerHTML = ''; // Xóa xúc xắc cũ
-    dices.forEach(val => {
-        const img = document.createElement('img');
-        img.src = `./assets/dice/dice${val}.png`; // Đảm bảo bạn có folder ảnh này
-        img.className = 'dice-item bounce-in';
-        diceContainer.appendChild(img);
-    });
-
-    // Tính tổng điểm để hiển thị Tài/Xỉu
-    const total = dices.reduce((a, b) => a + b, 0);
-    const resultText = total >= 11 ? "TÀI" : "XỈU";
-    document.getElementById('result-label').innerText = `${total} - ${resultText}`;
-}
-
-// B. Hàm dọn bàn ván mới
-function resetGameUI() {
-    // Xóa tất cả chip trên bàn
-    const chips = document.querySelectorAll('.chip');
-    chips.forEach(c => c.remove());
-
-    // Reset các biến trạng thái cược
-    mySide = null;
-    pendingMoney = 0;
-    
-    // Ẩn các thông báo ván cũ
-    document.getElementById('nan-text').style.display = 'none';
-    document.getElementById('result-label').innerText = "";
-    document.getElementById('dice-result-container').innerHTML = "";
-}
-
-// C. Hàm tạo hiệu ứng bay của Chip (Khi bấm cược)
-function placeChipEffect(side, amount) {
-    const area = document.getElementById(side === 'TAI' ? 'area-tai' : 'area-xiu');
-    const chip = document.createElement('div');
-    chip.className = 'chip pending-chip';
-    chip.innerText = (amount / 1000) + "K";
-    
-    // Vị trí ngẫu nhiên trong vùng cược để nhìn cho tự nhiên
-    const randomX = Math.random() * 60 + 20;
-    const randomY = Math.random() * 60 + 20;
-    chip.style.left = randomX + "%";
-    chip.style.top = randomY + "%";
-
-    area.appendChild(chip);
-}
-
-// --- 4. LẮNG NGHE SOCKET ---
-function setupSocketListeners() {
-    socket.on('init', (data) => {
-        timer = data.timer;
-        phase = data.phase;
-        updateUI();
-    });
-
-    socket.on('tick', (data) => {
-        timer = data.timer;
-        phase = data.phase;
-        updateUI();
-    });
-
-    socket.on('open-result', (data) => {
-        showDiceUI(data.dices); // Gọi hàm hiện xúc xắc
-    });
-
-    socket.on('new-session', (data) => {
-        resetGameUI(); // Gọi hàm dọn bàn
-        document.getElementById('session-id').innerText = data.session;
-    });
-
-    socket.on('bet-ok', (data) => {
-        if (data && data.newBalance) balance = data.newBalance;
-        updateUI();
-        // Xác nhận chip đã vào hệ thống
-        document.querySelectorAll('.pending-chip').forEach(c => c.classList.replace('pending-chip', 'chip-confirmed'));
-    });
-
-    socket.on('update-balance', (newBalance) => {
-        const diff = newBalance - balance;
-        if (diff > 0) {
-            showWinEffect(diff); // Hiển thị hiệu ứng nhận tiền nếu thắng
-        }
-        balance = newBalance;
-        updateUI();
-    });
-}
-
-// D. Hiệu ứng nổ tiền khi thắng
-function showWinEffect(amount) {
-    const winPop = document.getElementById('win-popup');
-    if (winPop) {
-        winPop.innerText = "+" + amount.toLocaleString();
-        winPop.classList.add('show-up');
-        setTimeout(() => winPop.classList.remove('show-up'), 3000);
-    }
-}
-
-// --- 5. TIỆN ÍCH KHÁC ---
 async function fetchUserBalance(userId) {
     const { data } = await supabaseClient.from('players').select('balance').eq('id', userId).single();
     if (data) { balance = data.balance; updateUI(); }
 }
 
-function updateUI() {
-    const balEl = document.getElementById('balance');
-    const timerEl = document.getElementById('bowl-timer');
-    if (balEl) balEl.innerText = Math.floor(balance).toLocaleString();
-    if (timerEl) {
-        timerEl.innerText = timer;
-        timerEl.className = (timer <= 5 && phase === 'BET') ? 'timer-red' : 'timer-white';
-    }
+function setupSocketListeners() {
+    socket.on('tick', (data) => {
+        timer = data.timer; phase = data.phase;
+        updateUI();
+    });
+
+    socket.on('open-result', (data) => {
+        showDiceUI(data.dices);
+        if (data.winSide === mySide) playWinSound();
+    });
+
+    socket.on('new-session', (data) => {
+        resetGameUI();
+        document.getElementById('session-id').innerText = data.session;
+    });
+
+    socket.on('update-balance', (newBalance) => {
+        balance = newBalance;
+        updateUI();
+    });
+
+    socket.on('bet-ok', (data) => {
+        if (data.newBalance) balance = data.newBalance;
+        updateUI();
+        document.querySelectorAll('.pending-chip').forEach(c => c.classList.replace('pending-chip', 'confirmed'));
+    });
 }
 
-function initAudio() { console.log("Audio ready"); }
+function confirmBet(side) {
+    if (phase !== 'BET' || timer <= 2) return alert("Hết thời gian cược!");
+    mySide = side;
+    pendingMoney = 10000; // Ví dụ cược 10k
+    socket.emit('bet', { side, amount: pendingMoney });
+    placeChipEffect(side, pendingMoney);
+}
+
+function updateUI() {
+    document.getElementById('balance').innerText = balance.toLocaleString();
+    const tEl = document.getElementById('bowl-timer');
+    tEl.innerText = timer;
+    tEl.style.color = (timer <= 5 && phase === 'BET') ? 'red' : 'white';
+}
+
+function placeChipEffect(side, amt) {
+    const area = document.getElementById(side === 'TAI' ? 'area-tai' : 'area-xiu');
+    const chip = document.createElement('div');
+    chip.className = 'chip pending-chip';
+    chip.innerText = amt/1000 + "K";
+    chip.style.left = Math.random()*70 + "%";
+    chip.style.top = Math.random()*70 + "%";
+    area.appendChild(chip);
+}
+
+function resetGameUI() {
+    document.querySelectorAll('.chip').forEach(c => c.remove());
+    document.getElementById('dice-area').innerHTML = "";
+    mySide = null;
+}
 </script>
-</body>
