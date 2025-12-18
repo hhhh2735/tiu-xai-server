@@ -1,3 +1,5 @@
+let history = []; // lưu 100 phiên gần nhất
+
 const { rollDice, calcResult } = require("../services/game.service");
 const { updateBalance } = require("../services/balance.service");
 
