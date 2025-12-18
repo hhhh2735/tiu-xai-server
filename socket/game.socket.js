@@ -1,8 +1,10 @@
 const { rollDice, calcResult } = require("../services/game.service");
 const { updateBalance } = require("../services/balance.service");
 
+/* ================= GAME STATE ================= */
+
 let gameState = {
-  phase: "BET",          // BET | RESULT
+  phase: "BET",        // BET | RESULT
   timer: 30,
   session: 1,
   dices: [],
@@ -17,7 +19,7 @@ let payoutDone = false;
 setInterval(async () => {
   gameState.timer--;
 
-  // HẾT GIỜ ĐẶT CƯỢC → MỞ BÁT
+  /* ===== HẾT GIỜ ĐẶT CƯỢC ===== */
   if (gameState.phase === "BET" && gameState.timer <= 0) {
     gameState.phase = "RESULT";
     gameState.timer = 10;
@@ -25,19 +27,19 @@ setInterval(async () => {
 
     gameState.dices = rollDice();
     gameState.result = calcResult(gameState.dices);
+    // result.type: "TAI" | "XIU" | "TRIPLE"
 
-    // GỬI KẾT QUẢ CHO TẤT CẢ
     global.io.emit("open-result", {
       session: gameState.session,
       dices: gameState.dices,
       result: gameState.result,
     });
 
-    // TRẢ THƯỞNG 1 LẦN
+    // Trả thưởng sau khi mở bát
     setTimeout(handlePayout, 2000);
   }
 
-  // BẮT ĐẦU PHIÊN MỚI
+  /* ===== BẮT ĐẦU PHIÊN MỚI ===== */
   if (gameState.phase === "RESULT" && gameState.timer <= 0) {
     gameState.phase = "BET";
     gameState.timer = 30;
@@ -49,6 +51,7 @@ setInterval(async () => {
     });
   }
 
+  /* ===== ĐỒNG HỒ CHẠY ===== */
   global.io.emit("tick", {
     phase: gameState.phase,
     timer: gameState.timer,
@@ -63,7 +66,7 @@ async function handlePayout() {
   if (payoutDone) return;
   payoutDone = true;
 
-  // TRIPLE → NHÀ ĂN
+  // TRIPLE → nhà ăn hết
   if (gameState.result.type === "TRIPLE") return;
 
   for (const bet of bets) {
@@ -82,24 +85,41 @@ module.exports = function gameSocket(io) {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    /* ===== JOIN GAME ===== */
     socket.on("join", (user) => {
-      socket.user = user; // { id, username }
+      // user: { id, username }
+      socket.user = user;
+
+      // GỬI STATE HIỆN TẠI CHO USER MỚI
+      socket.emit("init", {
+        phase: gameState.phase,
+        timer: gameState.timer,
+        session: gameState.session,
+      });
     });
 
+    /* ===== ĐẶT CƯỢC ===== */
     socket.on("bet", async ({ side, amount }) => {
       if (!socket.user) return;
       if (gameState.phase !== "BET") return;
+      if (gameState.timer <= 2) return;
       if (amount <= 0) return;
+      if (!["TAI", "XIU"].includes(side)) return;
 
-      await updateBalance(socket.user.id, -amount);
+      try {
+        // Trừ tiền trước
+        await updateBalance(socket.user.id, -amount);
 
-      bets.push({
-        userId: socket.user.id,
-        side,
-        amount,
-      });
+        bets.push({
+          userId: socket.user.id,
+          side,
+          amount,
+        });
 
-      socket.emit("bet-ok");
+        socket.emit("bet-ok");
+      } catch (err) {
+        socket.emit("error", "Không đủ số dư");
+      }
     });
 
     socket.on("disconnect", () => {
