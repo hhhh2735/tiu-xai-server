@@ -3,117 +3,141 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
     <script>
-// --- CẤU HÌNH KẾT NỐI ---
+// --- 1. CẤU HÌNH KẾT NỐI ---
 const SERVER_URL = "https://tiu-xai-server.onrender.com"; 
 const SUPABASE_URL = "https://qimyjctcipdgkfhudunv.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; // Copy Anon Key từ Supabase của bạn
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."; 
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 let socket;
-
 let balance = 0, selectedAmt = 100000, timer = 30, phase = 'BET';
 let mySide = null, pendingMoney = 0, confirmedMoney = 0;
-let resDice = [1,1,1], roadData = [];
+let resDice = [1, 1, 1];
 
-// --- HÀM LOGIN THẬT ---
+// Thêm hàm initAudio để tránh lỗi khi click vào body
+function initAudio() {
+    console.log("Audio initialized");
+}
+
 async function startLoading() {
-    const email = document.getElementById('user-input-name').value.trim(); // Ở đây bạn nên dùng Email/Pass nếu làm thật
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
     
-    // Giả sử bạn dùng Supabase Auth để lấy Token
-    // Trong ví dụ này, để khớp với Backend bạn gửi, ta cần một Token hợp lệ
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (!session) {
-        alert("Vui lòng đăng nhập qua Supabase trước!");
+    if (!session || error) {
+        alert("Phiên đăng nhập hết hạn hoặc chưa đăng nhập!");
         return;
     }
 
-    const token = session.access_token;
+    await fetchUserBalance(session.user.id);
 
-    // KẾT NỐI SOCKET VỚI TOKEN (Khớp với authSocket middleware)
     socket = io(SERVER_URL, {
-        auth: { token: token },
+        auth: { token: session.access_token },
         transports: ["websocket"]
     });
 
-    // Chạy hiệu ứng Loading
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('loading-screen').style.display = 'flex';
     
     setupSocketListeners();
-    startLoadingAnimation();
+    
+    setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        if(loadingScreen) loadingScreen.style.display = 'none';
+    }, 2000);
+}
+
+async function fetchUserBalance(userId) {
+    const { data, error } = await supabaseClient
+        .from('players')
+        .select('balance')
+        .eq('id', userId)
+        .single();
+
+    if (data) {
+        balance = data.balance;
+        updateUI();
+    }
 }
 
 function setupSocketListeners() {
-    // Nhận trạng thái game từ server
     socket.on('init', (data) => {
         phase = data.phase;
         timer = data.timer;
-        document.getElementById('session-id').innerText = data.session;
+        const sessionEl = document.getElementById('session-id');
+        if(sessionEl) sessionEl.innerText = data.session;
         updateUI();
     });
 
-    // Đồng hồ đếm ngược
     socket.on('tick', (data) => {
         timer = data.timer;
         phase = data.phase;
         updateUI();
     });
 
-    // Mở bát
     socket.on('open-result', (data) => {
         resDice = data.dices;
-        phase = 'NAN'; // Chuyển sang chế độ nặn
-        document.getElementById('nan-text').style.display = 'block';
-        // Hiển thị kết quả sau khi nặn hoặc tự động
+        phase = 'NAN'; 
+        const nanText = document.getElementById('nan-text');
+        if(nanText) nanText.style.display = 'block';
+        
+        // Gọi hàm hiển thị xúc xắc nếu bạn đã định nghĩa
+        if(typeof showDiceUI === "function") showDiceUI(data.dices);
     });
 
-    // Phiên mới
     socket.on('new-session', (data) => {
-        resetGameUI();
-        document.getElementById('session-id').innerText = data.session;
+        // Reset các biến cược cho ván mới
+        mySide = null;
+        pendingMoney = 0;
+        confirmedMoney = 0;
+        
+        const sessionEl = document.getElementById('session-id');
+        if(sessionEl) sessionEl.innerText = data.session;
+        
+        // Gọi hàm xóa chip trên bàn nếu bạn đã định nghĩa
+        if(typeof resetGameUI === "function") resetGameUI();
     });
 
-    socket.on('bet-ok', () => {
+    socket.on('bet-ok', (data) => {
         confirmedMoney += pendingMoney;
         pendingMoney = 0;
-        // Hiệu ứng chip xác nhận
+        if (data && data.newBalance !== undefined) balance = data.newBalance;
+        updateUI();
+        
         document.querySelectorAll('.pending-chip').forEach(chip => {
-            chip.classList.remove('pending-chip');
-            chip.classList.add('chip-confirmed');
+            chip.classList.replace('pending-chip', 'chip-confirmed');
         });
     });
 
+    socket.on('update-balance', (newBalance) => {
+        balance = newBalance;
+        updateUI();
+    });
+
     socket.on('error', (msg) => {
-        showError(msg);
-        cancelBet();
+        alert(msg);
     });
 }
 
-// --- HÀM ĐẶT CƯỢC THẬT ---
 function confirmBet() {
-    if (pendingMoney <= 0 || phase !== 'BET' || timer <= 2) return;
+    if (pendingMoney <= 0) return;
+    if (phase !== 'BET' || timer <= 2) {
+        alert("Không thể đặt cược lúc này!");
+        return;
+    }
     
-    // Gửi lệnh cược lên Server (Server sẽ tự trừ tiền trong DB)
-    socket.emit('bet', { 
-        side: mySide, 
-        amount: pendingMoney 
-    });
+    socket.emit('bet', { side: mySide, amount: pendingMoney });
 }
 
-// --- CẬP NHẬT GIAO DIỆN ---
 function updateUI() {
-    document.getElementById('balance').innerText = Math.floor(balance).toLocaleString();
-    document.getElementById('bowl-timer').innerText = timer;
+    const balEl = document.getElementById('balance');
+    const timerEl = document.getElementById('bowl-timer');
     
-    // Logic hiển thị nút và trạng thái dựa trên timer/phase
-    if (phase === 'RESULT') {
-        document.getElementById('bowl-timer').style.color = '#ff4d4d';
-    } else {
-        document.getElementById('bowl-timer').style.color = '#fff';
+    if (balEl) balEl.innerText = Math.floor(balance).toLocaleString();
+    if (timerEl) {
+        timerEl.innerText = timer;
+        // Hiệu ứng đổi màu khi sắp hết giờ
+        timerEl.style.color = (timer <= 5 && phase === 'BET') ? '#ff4d4d' : '#fff';
     }
 }
-
-// ... Giữ các hàm playSnd, createChipEffect, showDiceUI của bạn ...
 </script>
 </body>
