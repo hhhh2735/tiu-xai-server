@@ -1690,6 +1690,58 @@ if(document.getElementById('rut-popup').style.display === 'flex') updateTurnover
 
 
 <script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // TẠM DÙNG USER RANDOM (sẽ thay bằng login sau này)
+  const user = {
+    id: Math.floor(Math.random() * 1000000),
+    username: "player" + Math.floor(Math.random() * 10000)
+  };
+
+  document.getElementById("username").innerText = user.username;
+
+  socket.emit("join", user);
+
+  // LẮNG NGHE TICK (timer/phase/session)
+  socket.on("tick", data => {
+    document.getElementById("timer").innerText = data.timer;
+    document.getElementById("phase").innerText = data.phase;
+    document.getElementById("session").innerText = data.session;
+  });
+
+  // LẮNG NGHE KẾT QUẢ KHI MỞ BÁT
+  socket.on("open-result", data => {
+    document.getElementById("dices").innerText = data.dices.join(" - ");
+    document.getElementById("result-text").innerText = data.result.type;
+    addLog(`Phiên ${data.session} → ${data.result.type}`);
+  });
+
+  // NHẬN BALANCE MỚI
+  socket.on("update-balance", balance => {
+    document.getElementById("balance").innerText = balance;
+  });
+
+  socket.on("bet-ok", () => {
+    addLog("Đặt cược thành công");
+  });
+
+  socket.on("error", msg => {
+    addLog("Lỗi: " + msg);
+  });
+
+  function placeBet(side, amount) {
+    socket.emit("bet", { side, amount });
+    addLog("Cược " + side + " " + amount);
+  }
+
+  function addLog(text) {
+    const d = document.createElement("div");
+    d.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+    document.getElementById("log").prepend(d);
+  }
+</script>
+
 
 </body>
 
